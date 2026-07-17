@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Type__c</fullName>
+    <label>Type</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>false</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+                <value>
+                    <fullName>Financial Report</fullName>
+                    <default>false</default>
+                    <label>Financial Report</label>
+                </value>
+                <value>
+                    <fullName>Progress Report</fullName>
+                    <default>false</default>
+                    <label>Progress Report</label>
+                </value>
+                <value>
+                    <fullName>Letter of Intent (LOI)</fullName>
+                    <default>false</default>
+                    <label>Letter of Intent (LOI)</label>
+                </value>
+                <value>
+                    <fullName>Tax Exemption Document</fullName>
+                    <default>false</default>
+                    <label>Tax Exemption Document</label>
+                </value>
+                <value>
+                    <fullName>Final Evaluation</fullName>
+                    <default>false</default>
+                    <label>Final Evaluation</label>
+                </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

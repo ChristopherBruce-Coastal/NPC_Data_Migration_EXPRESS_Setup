@@ -302,7 +302,18 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             rowKeys.add(rowKey);
         }
 
-        List<Database.SaveResult> results = Database.insert(recs, false);
+        // Bypass duplicate rules for the seed insert. NPC orgs ship with standard
+        // Account/Contact/Lead duplicate rules active; the synthetic dataset trips
+        // them ("Use one of these records?"), silently rejecting rows. The baseline
+        // seed is known-good sterile data and must load regardless of the org's
+        // duplicate-rule configuration, so we bypass at the DML layer here rather
+        // than depend on each learner deactivating rules manually. The org's
+        // duplicate rules remain active for the learner's own de-duplication
+        // exercise (FR-1.2) - only these loader inserts bypass them.
+        Database.DMLOptions dml = new Database.DMLOptions();
+        dml.duplicateRuleHeader.allowSave = true;
+        dml.optAllOrNone = false;
+        List<Database.SaveResult> results = Database.insert(recs, dml);
         Integer ok = 0;
         Integer err = 0;
         List<String> samples = new List<String>();

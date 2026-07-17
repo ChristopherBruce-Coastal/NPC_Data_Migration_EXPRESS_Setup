@@ -36,23 +36,23 @@ Complete these in order. Each step depends on the one before it.
    GiftTransaction object and its fields exist. Without this, the GiftTransaction step
    of the seed is skipped and the deploy of GiftTransaction fields fails.
 
-4. **Enable State and Country/Territory Picklists.** Setup > search "State and Country/Territory
+4. Assign the Fundraising Access permission set license.** Setup > Users > your user >
+   Permission Set License Assignments > Edit Assignments > enable **Fundraising Access** >
+   Save. The Fundraising Admin permission set cannot function without this license, and
+   the GiftTransaction step of the seed fails without it.
+
+5. **Enable State and Country/Territory Picklists.** Setup > search "State and Country/Territory
    Picklists" > enable. The dataset uses state and country values; the loader writes to the
    picklist code fields when this is on.
 
-5. **Deploy this package from GitHub.** Use the Deploy button below. See
+6. **Deploy this package from GitHub.** Use the Deploy button below. See
    [Deploy](#deploy) for the button and troubleshooting.
 
-6. **Assign the permission sets to your user.** Setup > Permission Sets, then for each
+7. **Assign the permission sets to your user.** Setup > Permission Sets, then for each
    of **EXPRESS Training Data Admin** and **Fundraising Admin**: open it > Manage
    Assignments > Add Assignment > select your user > Assign. EXPRESS Training Data Admin
    grants access to the custom object, fields, and the loader; Fundraising Admin grants
    access to the Fundraising objects the seed writes to.
-
-7. **Assign the Fundraising Access permission set license.** Setup > Users > your user >
-   Permission Set License Assignments > Edit Assignments > enable **Fundraising Access** >
-   Save. The Fundraising Admin permission set cannot function without this license, and
-   the GiftTransaction step of the seed fails without it.
 
 8. **Run the seed.** Open the Developer Console > Debug > Open Execute Anonymous Window,
    paste the following, and execute:

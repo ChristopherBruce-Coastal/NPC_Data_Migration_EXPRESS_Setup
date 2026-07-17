@@ -23,7 +23,7 @@ is a best-effort purge).
 
 ## Setup order (do not skip ahead)
 
-1. **Get your NPC training org** per the course guide (Person Accounts come enabled).
+1. **Get your NPC training org** per the course guide.
 2. **Create the Business Account record type** on Account, per the setup guide:
    Setup > Object Manager > Account > Record Types > New. Label it exactly
    `Business Account` (developer name `Business_Account`), activate it, and make it

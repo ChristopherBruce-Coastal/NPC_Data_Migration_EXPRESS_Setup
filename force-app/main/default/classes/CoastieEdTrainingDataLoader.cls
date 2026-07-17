@@ -16,8 +16,10 @@
  *   clear message if any precheck fails.
  * - Insert-based and therefore one-shot per org. To reseed, use a fresh
  *   training org (or scripts/reset-data.apex, best effort).
- * - Fully dynamic (no compile-time reference to GiftTransaction), so the class
- *   compiles in any org; missing objects are reported as SKIPPED.
+ * - Fully dynamic: no compile-time reference to GiftTransaction OR to the
+ *   Person Accounts IsPersonType field, so the class compiles in any org.
+ *   Missing objects are reported as SKIPPED; a missing Person Accounts feature
+ *   is reported by the precheck with a learner-facing message.
  */
 public with sharing class CoastieEdTrainingDataLoader implements Queueable {
 
@@ -74,8 +76,12 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
     /** Returns null when the org is ready to seed, otherwise a learner-facing message. */
     @TestVisible
     private static String precheck() {
+        if (!personAccountsEnabled()) {
+            return 'SETUP INCOMPLETE: Person Accounts is not enabled in this org. This loader requires a '
+                + 'Nonprofit Cloud org with Person Accounts enabled. Complete the org setup steps first.';
+        }
         if (personAccountRecordTypeId() == null) {
-            return 'SETUP INCOMPLETE: No Person Account record type found. This loader requires a '
+            return 'SETUP INCOMPLETE: No active Person Account record type found. This loader requires a '
                 + 'Nonprofit Cloud org with Person Accounts enabled. Complete the org setup steps first.';
         }
         if (businessAccountRecordTypeId() == null) {
@@ -91,24 +97,43 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         return null;
     }
 
+    /**
+     * True when Person Accounts is enabled in this org. Detected via describe so the
+     * class carries no compile-time dependency on the IsPersonType field, which only
+     * exists once the feature is turned on. Without this guard, the class fails to
+     * compile in a non-Person-Account org and the precheck above can never run.
+     */
+    @TestVisible
+    private static Boolean personAccountsEnabled() {
+        return Schema.SObjectType.RecordType.fields.getMap().containsKey('IsPersonType');
+    }
+
     @TestVisible
     private static Id personAccountRecordTypeId() {
-        List<RecordType> rts = [
-            SELECT Id FROM RecordType
-            WHERE SObjectType = 'Account' AND IsPersonType = true AND IsActive = true
-            LIMIT 1
-        ];
+        if (!personAccountsEnabled()) {
+            return null;
+        }
+        // Dynamic SOQL: IsPersonType is only a valid column when Person Accounts is enabled.
+        List<RecordType> rts = Database.query(
+            'SELECT Id FROM RecordType '
+            + 'WHERE SObjectType = \'Account\' AND IsPersonType = true AND IsActive = true '
+            + 'LIMIT 1'
+        );
         return rts.isEmpty() ? null : rts[0].Id;
     }
 
     @TestVisible
     private static Id businessAccountRecordTypeId() {
-        List<RecordType> rts = [
-            SELECT Id FROM RecordType
-            WHERE SObjectType = 'Account' AND IsPersonType = false AND IsActive = true
-            AND (DeveloperName = 'Business_Account' OR Name = 'Business Account')
-            LIMIT 1
-        ];
+        // Built dynamically so the IsPersonType predicate is only added when the field
+        // exists. In a non-Person-Account org, all Account record types are business.
+        String soql = 'SELECT Id FROM RecordType '
+            + 'WHERE SObjectType = \'Account\' AND IsActive = true '
+            + 'AND (DeveloperName = \'Business_Account\' OR Name = \'Business Account\')';
+        if (personAccountsEnabled()) {
+            soql += ' AND IsPersonType = false';
+        }
+        soql += ' LIMIT 1';
+        List<RecordType> rts = Database.query(soql);
         return rts.isEmpty() ? null : rts[0].Id;
     }
 
@@ -180,6 +205,8 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
 
         Set<String> skippedCols = new Set<String>();
         Integer skippedMissingParent = 0;
+        Integer parseErrors = 0;
+        List<String> parseSamples = new List<String>();
         List<SObject> recs = new List<SObject>();
         List<String> rowKeys = new List<String>();
 
@@ -190,6 +217,7 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             String rowKey = null;
             Boolean missingParent = false;
             Boolean isPerson = false;
+            Boolean rowParseFailed = false;
 
             for (Integer c = 0; c < headers.size(); c++) {
                 String h = headers[c].trim();
@@ -228,20 +256,39 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
                 }
                 if (fTok == null) { skippedCols.add(h); continue; }
 
-                Schema.DisplayType dt = fTok.getDescribe().getType();
-                if (dt == Schema.DisplayType.DATE) {
-                    rec.put(fname, Date.valueOf(v));
-                } else if (dt == Schema.DisplayType.CURRENCY
-                        || dt == Schema.DisplayType.DOUBLE
-                        || dt == Schema.DisplayType.PERCENT) {
-                    rec.put(fname, Decimal.valueOf(v));
-                } else if (dt == Schema.DisplayType.BOOLEAN) {
-                    rec.put(fname, v.equalsIgnoreCase('TRUE'));
-                } else {
-                    rec.put(fname, v);
+                // Typed conversion. A malformed value fails only THIS row, not the
+                // whole object load: the row is dropped and counted, and the rest of
+                // the file still inserts via the partial-success DML below.
+                try {
+                    Schema.DisplayType dt = fTok.getDescribe().getType();
+                    if (dt == Schema.DisplayType.DATE) {
+                        rec.put(fname, Date.valueOf(v));
+                    } else if (dt == Schema.DisplayType.DATETIME) {
+                        rec.put(fname, Datetime.valueOf(v));
+                    } else if (dt == Schema.DisplayType.CURRENCY
+                            || dt == Schema.DisplayType.DOUBLE
+                            || dt == Schema.DisplayType.PERCENT) {
+                        rec.put(fname, Decimal.valueOf(v));
+                    } else if (dt == Schema.DisplayType.INTEGER) {
+                        rec.put(fname, Integer.valueOf(v));
+                    } else if (dt == Schema.DisplayType.BOOLEAN) {
+                        rec.put(fname, v.equalsIgnoreCase('TRUE'));
+                    } else {
+                        rec.put(fname, v);
+                    }
+                } catch (Exception parseEx) {
+                    rowParseFailed = true;
+                    if (parseSamples.size() < 3) {
+                        parseSamples.add(objectApi + '.' + fname + '="' + v + '" (' + parseEx.getMessage() + ')');
+                    }
+                    break;
                 }
             }
 
+            if (rowParseFailed) {
+                parseErrors++;
+                continue;
+            }
             if (missingParent) {
                 skippedMissingParent++;
                 continue;
@@ -254,25 +301,30 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             rowKeys.add(rowKey);
         }
 
-        List<Database.SaveResult> results = Database.insert(recs, false);
         Integer ok = 0;
         Integer err = 0;
         List<String> samples = new List<String>();
-        for (Integer i = 0; i < results.size(); i++) {
-            Database.SaveResult r = results[i];
-            if (r.isSuccess()) {
-                ok++;
-                if (rowKeys[i] != null) { out.keys.put(rowKeys[i], r.getId()); }
-            } else {
-                err++;
-                if (samples.size() < 3) {
-                    samples.add(r.getErrors()[0].getMessage());
+        if (!recs.isEmpty()) {
+            List<Database.SaveResult> results = Database.insert(recs, false);
+            for (Integer i = 0; i < results.size(); i++) {
+                Database.SaveResult r = results[i];
+                if (r.isSuccess()) {
+                    ok++;
+                    if (rowKeys[i] != null) { out.keys.put(rowKeys[i], r.getId()); }
+                } else {
+                    err++;
+                    if (samples.size() < 3) {
+                        samples.add(r.getErrors()[0].getMessage());
+                    }
                 }
             }
         }
+
         String msg = objectApi + ': success=' + ok + ', errors=' + err;
         if (skippedMissingParent > 0) { msg += ', skippedMissingParent=' + skippedMissingParent; }
+        if (parseErrors > 0) { msg += ', parseErrors=' + parseErrors; }
         if (!samples.isEmpty()) { msg += ' | sample errors: ' + String.join(samples, ' || '); }
+        if (!parseSamples.isEmpty()) { msg += ' | sample parse failures: ' + String.join(parseSamples, ' || '); }
         if (!skippedCols.isEmpty()) { msg += ' | skipped columns: ' + String.join(new List<String>(skippedCols), ', '); }
         out.message = msg;
         return out;

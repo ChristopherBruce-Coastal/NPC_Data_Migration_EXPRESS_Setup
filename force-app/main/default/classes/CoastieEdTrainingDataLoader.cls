@@ -16,10 +16,19 @@
  *   clear message if any precheck fails.
  * - Insert-based and therefore one-shot per org. To reseed, use a fresh
  *   training org (or scripts/reset-data.apex, best effort).
- * - Fully dynamic: no compile-time reference to GiftTransaction OR to the
- *   Person Accounts IsPersonType field, so the class compiles in any org.
- *   Missing objects are reported as SKIPPED; a missing Person Accounts feature
- *   is reported by the precheck with a learner-facing message.
+ * - Fully dynamic (no compile-time reference to GiftTransaction), so the class
+ *   compiles in any org; missing objects are reported as SKIPPED.
+ *
+ * Chaining design (IMPORTANT):
+ * - Trial and Developer Edition orgs cap chained Queueable jobs at a stack
+ *   depth of 5 (including the initial parent). A one-object-per-link chain of
+ *   7 objects exceeds that cap and aborts mid-chain with
+ *   "Maximum stack depth has been reached".
+ * - To stay within the cap, objects are grouped into PHASES. Each phase loads
+ *   one or more objects in a single transaction, then enqueues the next phase.
+ *   4 phases = 4 chained jobs, one link under the cap, with headroom.
+ * - Phase grouping respects FR-5 dependency order: a child object is only
+ *   grouped with, or after, the parent whose key map it needs.
  */
 public with sharing class CoastieEdTrainingDataLoader implements Queueable {
 
@@ -36,16 +45,34 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         }
     }
 
+    /**
+     * Objects grouped into chained-Queueable phases (see class header).
+     * Phase 0: Account
+     * Phase 1: Contact -> AccountContactRelation -> Lead
+     *          (Contact builds its key map in-transaction; ACR consumes it;
+     *           Lead is standalone and rides along to save a chain link)
+     * Phase 2: Opportunity
+     * Phase 3: GiftTransaction -> Deliverable__c
+     *          (both resolve only against the Opportunity key map)
+     */
     @TestVisible
-    private static List<Step> steps() {
-        return new List<Step>{
-            new Step('Account',                'CE_Account',         true),
-            new Step('Contact',                'CE_Contact',         true),
-            new Step('AccountContactRelation', 'CE_ACR',             false),
-            new Step('Lead',                   'CE_Lead',            false),
-            new Step('Opportunity',            'CE_Opportunity',     true),
-            new Step('GiftTransaction',        'CE_GiftTransaction', false),
-            new Step('Deliverable__c',         'CE_Deliverable',     false)
+    private static List<List<Step>> phases() {
+        return new List<List<Step>>{
+            new List<Step>{
+                new Step('Account', 'CE_Account', true)
+            },
+            new List<Step>{
+                new Step('Contact',                'CE_Contact', true),
+                new Step('AccountContactRelation', 'CE_ACR',     false),
+                new Step('Lead',                   'CE_Lead',    false)
+            },
+            new List<Step>{
+                new Step('Opportunity', 'CE_Opportunity', true)
+            },
+            new List<Step>{
+                new Step('GiftTransaction', 'CE_GiftTransaction', false),
+                new Step('Deliverable__c',  'CE_Deliverable',     false)
+            }
         };
     }
 
@@ -54,17 +81,17 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         public Map<String, Id> keys = new Map<String, Id>();
     }
 
-    private Integer stepIndex;
+    private Integer phaseIndex;
     private String summary;
     private Map<String, Map<String, Id>> keyMaps;
 
-    public CoastieEdTrainingDataLoader(Integer stepIndex, String summary, Map<String, Map<String, Id>> keyMaps) {
-        this.stepIndex = stepIndex;
+    public CoastieEdTrainingDataLoader(Integer phaseIndex, String summary, Map<String, Map<String, Id>> keyMaps) {
+        this.phaseIndex = phaseIndex;
         this.summary = summary;
         this.keyMaps = keyMaps;
     }
 
-    /** Entry point. Validates prerequisites, then enqueues the first load step. */
+    /** Entry point. Validates prerequisites, then enqueues the first load phase. */
     public static Id run() {
         String problem = precheck();
         if (problem != null) {
@@ -76,12 +103,8 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
     /** Returns null when the org is ready to seed, otherwise a learner-facing message. */
     @TestVisible
     private static String precheck() {
-        if (!personAccountsEnabled()) {
-            return 'SETUP INCOMPLETE: Person Accounts is not enabled in this org. This loader requires a '
-                + 'Nonprofit Cloud org with Person Accounts enabled. Complete the org setup steps first.';
-        }
         if (personAccountRecordTypeId() == null) {
-            return 'SETUP INCOMPLETE: No active Person Account record type found. This loader requires a '
+            return 'SETUP INCOMPLETE: No Person Account record type found. This loader requires a '
                 + 'Nonprofit Cloud org with Person Accounts enabled. Complete the org setup steps first.';
         }
         if (businessAccountRecordTypeId() == null) {
@@ -97,71 +120,55 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         return null;
     }
 
-    /**
-     * True when Person Accounts is enabled in this org. Detected via describe so the
-     * class carries no compile-time dependency on the IsPersonType field, which only
-     * exists once the feature is turned on. Without this guard, the class fails to
-     * compile in a non-Person-Account org and the precheck above can never run.
-     */
-    @TestVisible
-    private static Boolean personAccountsEnabled() {
-        return Schema.SObjectType.RecordType.fields.getMap().containsKey('IsPersonType');
-    }
-
     @TestVisible
     private static Id personAccountRecordTypeId() {
-        if (!personAccountsEnabled()) {
-            return null;
-        }
-        // Dynamic SOQL: IsPersonType is only a valid column when Person Accounts is enabled.
-        List<RecordType> rts = Database.query(
-            'SELECT Id FROM RecordType '
-            + 'WHERE SObjectType = \'Account\' AND IsPersonType = true AND IsActive = true '
-            + 'LIMIT 1'
-        );
+        List<RecordType> rts = [
+            SELECT Id FROM RecordType
+            WHERE SObjectType = 'Account' AND IsPersonType = true AND IsActive = true
+            LIMIT 1
+        ];
         return rts.isEmpty() ? null : rts[0].Id;
     }
 
     @TestVisible
     private static Id businessAccountRecordTypeId() {
-        // Built dynamically so the IsPersonType predicate is only added when the field
-        // exists. In a non-Person-Account org, all Account record types are business.
-        String soql = 'SELECT Id FROM RecordType '
-            + 'WHERE SObjectType = \'Account\' AND IsActive = true '
-            + 'AND (DeveloperName = \'Business_Account\' OR Name = \'Business Account\')';
-        if (personAccountsEnabled()) {
-            soql += ' AND IsPersonType = false';
-        }
-        soql += ' LIMIT 1';
-        List<RecordType> rts = Database.query(soql);
+        List<RecordType> rts = [
+            SELECT Id FROM RecordType
+            WHERE SObjectType = 'Account' AND IsPersonType = false AND IsActive = true
+            AND (DeveloperName = 'Business_Account' OR Name = 'Business Account')
+            LIMIT 1
+        ];
         return rts.isEmpty() ? null : rts[0].Id;
     }
 
     public void execute(QueueableContext ctx) {
-        Step s = steps()[stepIndex];
-        StepResult result;
-        try {
-            result = loadStep(s, keyMaps);
-        } catch (Exception e) {
-            result = new StepResult();
-            result.message = s.objectApi + ': FAILED - ' + e.getMessage();
-        }
-        summary += result.message + '\n';
-        System.debug(LoggingLevel.INFO, result.message);
+        List<Step> phase = phases()[phaseIndex];
 
-        if (s.buildKeyMap) {
-            keyMaps.put(s.objectApi, result.keys);
-        }
-        // Free maps that no later step references, to keep queueable state small.
-        if (s.objectApi == 'AccountContactRelation') {
-            keyMaps.remove('Contact');
-        }
-        if (s.objectApi == 'GiftTransaction') {
-            keyMaps.remove('Account');
+        for (Step s : phase) {
+            StepResult result;
+            try {
+                result = loadStep(s, keyMaps);
+            } catch (Exception e) {
+                result = new StepResult();
+                result.message = s.objectApi + ': FAILED - ' + e.getMessage();
+            }
+            summary += result.message + '\n';
+            System.debug(LoggingLevel.INFO, result.message);
+
+            if (s.buildKeyMap) {
+                keyMaps.put(s.objectApi, result.keys);
+            }
+            // Free maps that no later step references, to keep queueable state small.
+            if (s.objectApi == 'AccountContactRelation') {
+                keyMaps.remove('Contact');
+            }
+            if (s.objectApi == 'GiftTransaction') {
+                keyMaps.remove('Account');
+            }
         }
 
-        if (stepIndex + 1 < steps().size()) {
-            System.enqueueJob(new CoastieEdTrainingDataLoader(stepIndex + 1, summary, keyMaps));
+        if (phaseIndex + 1 < phases().size()) {
+            System.enqueueJob(new CoastieEdTrainingDataLoader(phaseIndex + 1, summary, keyMaps));
         } else {
             finish(summary);
         }
@@ -200,13 +207,34 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         List<String> lines = csvBody.replace('\r\n', '\n').replace('\r', '\n').split('\n');
         List<String> headers = lines[0].split(',', -1);
 
+        // --- HOISTED: resolve each data column's field token and DisplayType ONCE
+        //     per header, before the row loop. At ~1,700-2,200 rows per merged
+        //     phase, a per-row-per-field getDescribe() is the dominant CPU cost
+        //     and the cause of the original chain's CPU pressure. Precomputing
+        //     drops describe calls from (fields x rows) to (fields).
+        Map<Integer, String> colToField = new Map<Integer, String>();               // col index -> resolved API name
+        Map<Integer, Schema.DisplayType> colToType = new Map<Integer, Schema.DisplayType>();
+        for (Integer c = 0; c < headers.size(); c++) {
+            String h = headers[c].trim();
+            if (h == '#Key' || h == '#PersonAccount' || h.startsWith('Ref:')) { continue; }
+            String fname = h;
+            Schema.SObjectField fTok = fieldMap.get(fname.toLowerCase());
+            if (fTok == null && (fname.endsWith('StateCode') || fname.endsWith('CountryCode'))) {
+                // Fallback for orgs without State & Country picklists enabled
+                String alt = fname.replace('StateCode', 'State').replace('CountryCode', 'Country');
+                fTok = fieldMap.get(alt.toLowerCase());
+                if (fTok != null) { fname = alt; }
+            }
+            if (fTok == null) { continue; }   // unknown column; row loop records it as skipped
+            colToField.put(c, fname);
+            colToType.put(c, fTok.getDescribe().getType());
+        }
+
         Id personRtId = objectApi == 'Account' ? personAccountRecordTypeId() : null;
         Id businessRtId = objectApi == 'Account' ? businessAccountRecordTypeId() : null;
 
         Set<String> skippedCols = new Set<String>();
         Integer skippedMissingParent = 0;
-        Integer parseErrors = 0;
-        List<String> parseSamples = new List<String>();
         List<SObject> recs = new List<SObject>();
         List<String> rowKeys = new List<String>();
 
@@ -217,7 +245,6 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             String rowKey = null;
             Boolean missingParent = false;
             Boolean isPerson = false;
-            Boolean rowParseFailed = false;
 
             for (Integer c = 0; c < headers.size(); c++) {
                 String h = headers[c].trim();
@@ -246,49 +273,23 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
                     continue;
                 }
 
-                String fname = h;
-                Schema.SObjectField fTok = fieldMap.get(fname.toLowerCase());
-                if (fTok == null && (fname.endsWith('StateCode') || fname.endsWith('CountryCode'))) {
-                    // Fallback for orgs without State & Country picklists enabled
-                    String alt = fname.replace('StateCode', 'State').replace('CountryCode', 'Country');
-                    fTok = fieldMap.get(alt.toLowerCase());
-                    if (fTok != null) { fname = alt; }
-                }
-                if (fTok == null) { skippedCols.add(h); continue; }
-
-                // Typed conversion. A malformed value fails only THIS row, not the
-                // whole object load: the row is dropped and counted, and the rest of
-                // the file still inserts via the partial-success DML below.
-                try {
-                    Schema.DisplayType dt = fTok.getDescribe().getType();
-                    if (dt == Schema.DisplayType.DATE) {
-                        rec.put(fname, Date.valueOf(v));
-                    } else if (dt == Schema.DisplayType.DATETIME) {
-                        rec.put(fname, Datetime.valueOf(v));
-                    } else if (dt == Schema.DisplayType.CURRENCY
-                            || dt == Schema.DisplayType.DOUBLE
-                            || dt == Schema.DisplayType.PERCENT) {
-                        rec.put(fname, Decimal.valueOf(v));
-                    } else if (dt == Schema.DisplayType.INTEGER) {
-                        rec.put(fname, Integer.valueOf(v));
-                    } else if (dt == Schema.DisplayType.BOOLEAN) {
-                        rec.put(fname, v.equalsIgnoreCase('TRUE'));
-                    } else {
-                        rec.put(fname, v);
-                    }
-                } catch (Exception parseEx) {
-                    rowParseFailed = true;
-                    if (parseSamples.size() < 3) {
-                        parseSamples.add(objectApi + '.' + fname + '="' + v + '" (' + parseEx.getMessage() + ')');
-                    }
-                    break;
+                // Data column: use the hoisted field/type maps.
+                if (!colToField.containsKey(c)) { skippedCols.add(h); continue; }
+                String fname = colToField.get(c);
+                Schema.DisplayType dt = colToType.get(c);
+                if (dt == Schema.DisplayType.DATE) {
+                    rec.put(fname, Date.valueOf(v));
+                } else if (dt == Schema.DisplayType.CURRENCY
+                        || dt == Schema.DisplayType.DOUBLE
+                        || dt == Schema.DisplayType.PERCENT) {
+                    rec.put(fname, Decimal.valueOf(v));
+                } else if (dt == Schema.DisplayType.BOOLEAN) {
+                    rec.put(fname, v.equalsIgnoreCase('TRUE'));
+                } else {
+                    rec.put(fname, v);
                 }
             }
 
-            if (rowParseFailed) {
-                parseErrors++;
-                continue;
-            }
             if (missingParent) {
                 skippedMissingParent++;
                 continue;
@@ -301,30 +302,25 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             rowKeys.add(rowKey);
         }
 
+        List<Database.SaveResult> results = Database.insert(recs, false);
         Integer ok = 0;
         Integer err = 0;
         List<String> samples = new List<String>();
-        if (!recs.isEmpty()) {
-            List<Database.SaveResult> results = Database.insert(recs, false);
-            for (Integer i = 0; i < results.size(); i++) {
-                Database.SaveResult r = results[i];
-                if (r.isSuccess()) {
-                    ok++;
-                    if (rowKeys[i] != null) { out.keys.put(rowKeys[i], r.getId()); }
-                } else {
-                    err++;
-                    if (samples.size() < 3) {
-                        samples.add(r.getErrors()[0].getMessage());
-                    }
+        for (Integer i = 0; i < results.size(); i++) {
+            Database.SaveResult r = results[i];
+            if (r.isSuccess()) {
+                ok++;
+                if (rowKeys[i] != null) { out.keys.put(rowKeys[i], r.getId()); }
+            } else {
+                err++;
+                if (samples.size() < 3) {
+                    samples.add(r.getErrors()[0].getMessage());
                 }
             }
         }
-
         String msg = objectApi + ': success=' + ok + ', errors=' + err;
         if (skippedMissingParent > 0) { msg += ', skippedMissingParent=' + skippedMissingParent; }
-        if (parseErrors > 0) { msg += ', parseErrors=' + parseErrors; }
         if (!samples.isEmpty()) { msg += ' | sample errors: ' + String.join(samples, ' || '); }
-        if (!parseSamples.isEmpty()) { msg += ' | sample parse failures: ' + String.join(parseSamples, ' || '); }
         if (!skippedCols.isEmpty()) { msg += ' | skipped columns: ' + String.join(new List<String>(skippedCols), ', '); }
         out.message = msg;
         return out;

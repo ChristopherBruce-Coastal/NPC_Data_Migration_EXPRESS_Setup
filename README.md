@@ -45,13 +45,11 @@ the chain finishes.
 
 ## Deploy button
 
-Replace `YOUR_GH_USER` after you fork/create the repo:
+## Deploy
 
-```html
 <a href="https://githubsfdeploy.herokuapp.com?owner=ChristopherBruce-Coastal&repo=NPC_Data_Migration_EXPRESS_Setup&ref=main">
   <img alt="Deploy to Salesforce" src="https://raw.githubusercontent.com/afawcett/githubsfdeploy/master/deploy.png">
 </a>
-```
 
 githubsfdeploy supports SFDX source-format repos and reads the default package
 directory (`force-app`) from `sfdx-project.json`. CLI alternative:

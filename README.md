@@ -1,4 +1,4 @@
-# Coastie-Ed EXPRESS Training Org (TARGET Dataset) - Learner Setup
+# NPC Data Migration EXPRESS Training Org (TARGET Dataset) - Learner Setup
 
 Deploys the training metadata and seeds the **sterile TARGET dataset** for the EXPRESS
 Data Migration program into **your own** Salesforce Nonprofit Cloud (NPC) training org.
@@ -17,7 +17,7 @@ to any field. After the seed completes, the org contains **no external IDs and n
 migration scaffolding**. You will design your own external ID strategy later in the
 program; this org starts clean, the way a real legacy org would.
 
-The loader is one-shot per org: it refuses to run if Coastie-Ed data already exists.
+The loader is one-shot per org: it refuses to run if EXPRESS data already exists.
 To start over, request a fresh training org (instructors: `scripts/reset-data.apex`
 is a best-effort purge).
 
@@ -48,7 +48,7 @@ the chain finishes.
 Replace `YOUR_GH_USER` after you fork/create the repo:
 
 ```html
-<a href="https://githubsfdeploy.herokuapp.com?owner=YOUR_GH_USER&repo=NPC_Data_Migration_EXPRESS_Setup&ref=main">
+<a href="https://githubsfdeploy.herokuapp.com?owner=ChristopherBruce-Coastal&repo=NPC_Data_Migration_EXPRESS_Setup&ref=main">
   <img alt="Deploy to Salesforce" src="https://raw.githubusercontent.com/afawcett/githubsfdeploy/master/deploy.png">
 </a>
 ```

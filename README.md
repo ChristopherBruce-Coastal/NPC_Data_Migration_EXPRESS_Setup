@@ -13,9 +13,7 @@ The dataset ships as CSV static resources. A Queueable Apex loader inserts the r
 in FR-5 relational order (Account -> Contact -> AccountContactRelation -> Lead ->
 Opportunity -> GiftTransaction -> Deliverable__c) and resolves every foreign key
 **in memory**: CSV row keys are mapped to the inserted record Ids and are never written
-to any field. After the seed completes, the org contains **no external IDs and no
-migration scaffolding**. You will design your own external ID strategy later in the
-program; this org starts clean, the way a real legacy org would.
+to any field.
 
 The loader is one-shot per org: it refuses to run if EXPRESS data already exists.
 To start over, request a fresh training org.

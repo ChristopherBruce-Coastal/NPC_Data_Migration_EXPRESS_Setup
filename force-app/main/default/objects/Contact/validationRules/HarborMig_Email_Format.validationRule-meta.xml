@@ -2,11 +2,8 @@
 <ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>HarborMig_Email_Format</fullName>
     <active>true</active>
-    <description>Tier-2 enforcement (F7). Rejects malformed email addresses on upsert so the SOURCE malformed-email defects must be cleansed before load. Seed-safe: seed Contacts carry well-formed emails and pass. Fires only on values that fail a basic email pattern.</description>
-    <errorConditionFormula>AND(
-  NOT(ISBLANK(Email)),
-  NOT(REGEX(Email, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"))
-)</errorConditionFormula>
+    <description>Tier-2 (F7): rejects malformed emails on upsert. Seed-safe.</description>
+    <errorConditionFormula>AND(&#10;  NOT(ISBLANK(Email)),&#10;  OR(&#10;    NOT(CONTAINS(Email, "@")),&#10;    NOT(CONTAINS(RIGHT(Email, LEN(Email) - FIND("@", Email)), ".")),&#10;    CONTAINS(Email, " "),&#10;    CONTAINS(Email, ".."),&#10;    CONTAINS(Email, "@@")&#10;  )&#10;)</errorConditionFormula>
     <errorDisplayField>Email</errorDisplayField>
-    <errorMessage>Email address is not in a valid format. Cleanse the source email before migrating (check for missing @, spaces, double dots, or trailing characters).</errorMessage>
+    <errorMessage>Email address is not in a valid format. Cleanse the source email before migrating (check for a missing @, missing domain dot, spaces, or double dots).</errorMessage>
 </ValidationRule>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bypass_Automation__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>When true, Tier-3 training automations (e.g. HarborAccountEnrichment) skip execution. The seed loader sets this true during the load and resets it to false on completion, so the seed loads clean while learner upserts still hit the automations.</description>
+    <label>Bypass Automation</label>
+    <type>Checkbox</type>
+</CustomField>

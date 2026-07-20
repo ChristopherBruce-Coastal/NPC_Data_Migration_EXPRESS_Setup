@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HarborMig_Gift_Requires_Opp</fullName>
+    <active>true</active>
+    <description>Tier-2 (F1): GiftTransaction requires a parent Opportunity. Seed-safe.</description>
+    <errorConditionFormula>ISBLANK(Source_Opportunity__c)</errorConditionFormula>
+    <errorDisplayField>Source_Opportunity__c</errorDisplayField>
+    <errorMessage>A Gift Transaction must be linked to a parent Opportunity. Resolve the orphaned or missing payment-to-opportunity reference before migrating.</errorMessage>
+</ValidationRule>

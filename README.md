@@ -36,10 +36,9 @@ Complete these in order. Each step depends on the one before it.
    GiftTransaction object and its fields exist. Without this, the GiftTransaction step
    of the seed is skipped and the deploy of GiftTransaction fields fails.
 
-4. Assign the Fundraising Access permission set license.** Setup > Users > your user >
-   Permission Set License Assignments > Edit Assignments > enable **Fundraising Access** >
-   Save. The Fundraising Admin permission set cannot function without this license, and
-   the GiftTransaction step of the seed fails without it.
+4. **Assign the Fundraising Admin permission set group.** Setup > Users > your user >
+   Permission Set Group Assignments > Edit Assignments > enable **Fundraising Admin** >
+   Save. **The GiftTransaction step of the seed fails without it.**
 
 5. **Enable State and Country/Territory Picklists.** Setup > search "State and Country/Territory
    Picklists" > enable. The dataset uses state and country values; the loader writes to the

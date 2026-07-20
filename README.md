@@ -22,7 +22,7 @@ To start over, request a fresh training org.
 
 Complete these in order. Each step depends on the one before it.
 
-1. **Create your base NPC org.** [Get your Nonprofit Cloud training org per the course guide *(Ctrl+Click to open in a new tab)*.](https://www.salesforce.com/form/sfdo/signup/nonprofit/nonprofit-cloud-base-trial/?noskip=true)
+1. **Create your base NPC org.** [Get your Nonprofit Cloud training org per the course guide *(Ctrl+Click or Cmd+Click(Mac) to open in a new tab)*.](https://www.salesforce.com/form/sfdo/signup/nonprofit/nonprofit-cloud-base-trial/?noskip=true)
 
 2. **Enable Person Accounts.** Setup > search "Person Accounts" > follow the enablement
    steps. This is irreversible in a standard org, which is fine for a disposable training org.

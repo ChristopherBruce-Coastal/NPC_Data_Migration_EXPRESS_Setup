@@ -2,11 +2,8 @@
 <ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>HarborMig_Paid_Requires_Date</fullName>
     <active>true</active>
-    <description>Tier-2 enforcement (F10). A GiftTransaction marked Paid must carry a TransactionDate. Forces the learner to resolve the SOURCE "blank payment date + inactive source code" defect: an unpaid/scheduled pledge should not migrate as a Paid gift with no date. Seed-safe: seed gifts are Status=Paid AND have TransactionDate, so they pass. Fires when a Paid record arrives with a blank date.</description>
-    <errorConditionFormula>AND(
-  ISPICKVAL(Status, "Paid"),
-  ISBLANK(TransactionDate)
-)</errorConditionFormula>
+    <description>Tier-2 (F10): a Paid GiftTransaction must have a TransactionDate. Seed-safe.</description>
+    <errorConditionFormula>AND(&#10;  ISPICKVAL(Status, "Paid"),&#10;  ISBLANK(TransactionDate)&#10;)</errorConditionFormula>
     <errorDisplayField>TransactionDate</errorDisplayField>
     <errorMessage>A Paid gift transaction must have a Transaction Date. If this is an unpaid or scheduled pledge, set the correct Status rather than migrating it as Paid with a blank date.</errorMessage>
 </ValidationRule>

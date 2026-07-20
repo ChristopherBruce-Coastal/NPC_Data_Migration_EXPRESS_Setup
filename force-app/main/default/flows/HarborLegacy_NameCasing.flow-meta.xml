@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>67.0</apiVersion>
+    <assignments>
+        <name>Set_Proper_Cased_Names</name>
+        <label>Set Proper Cased Names</label>
+        <locationX>176</locationX>
+        <locationY>288</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.FirstName</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fmlProperFirstName</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>$Record.LastName</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fmlProperLastName</elementReference>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <description>TIER-3 training enforcement. Visibly proper-cases ALL-CAPS or all-lowercase contact names on insert so learners diagnose why loaded name casing differs from source. Named and traceable by design - part of the EXPRESS &apos;investigate the org&apos; exercise. Not a defect.</description>
+    <environments>Default</environments>
+    <formulas>
+        <name>fmlProperFirstName</name>
+        <dataType>String</dataType>
+        <expression>IF(
+  OR(
+    UPPER({!$Record.FirstName}) = {!$Record.FirstName},
+    LOWER({!$Record.FirstName}) = {!$Record.FirstName}
+  ),
+  UPPER(LEFT({!$Record.FirstName}, 1)) &amp; LOWER(MID({!$Record.FirstName}, 2, 255)),
+  {!$Record.FirstName}
+)</expression>
+    </formulas>
+    <formulas>
+        <name>fmlProperLastName</name>
+        <dataType>String</dataType>
+        <expression>IF(
+  OR(
+    UPPER({!$Record.LastName}) = {!$Record.LastName},
+    LOWER({!$Record.LastName}) = {!$Record.LastName}
+  ),
+  UPPER(LEFT({!$Record.LastName}, 1)) &amp; LOWER(MID({!$Record.LastName}, 2, 255)),
+  {!$Record.LastName}
+)</expression>
+    </formulas>
+    <interviewLabel>HarborLegacy_NameCasing {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>HarborLegacy_NameCasing</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Set_Proper_Cased_Names</targetReference>
+        </connector>
+        <filterFormula>NOT(ISBLANK({!$Record.LastName}))</filterFormula>
+        <object>Contact</object>
+        <recordTriggerType>Create</recordTriggerType>
+        <triggerType>RecordBeforeSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

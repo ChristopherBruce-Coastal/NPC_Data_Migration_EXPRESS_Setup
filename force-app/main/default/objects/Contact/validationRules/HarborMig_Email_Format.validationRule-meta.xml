@@ -3,7 +3,7 @@
     <fullName>HarborMig_Email_Format</fullName>
     <active>true</active>
     <description>Tier-2 (F7): rejects malformed emails on upsert. Seed-safe.</description>
-    <errorConditionFormula>AND(&#10;  NOT(ISBLANK(Email)),&#10;  OR(&#10;    NOT(CONTAINS(Email, "@")),&#10;    NOT(CONTAINS(RIGHT(Email, LEN(Email) - FIND("@", Email)), ".")),&#10;    CONTAINS(Email, " "),&#10;    CONTAINS(Email, ".."),&#10;    CONTAINS(Email, "@@")&#10;  )&#10;)</errorConditionFormula>
+    <errorConditionFormula>AND(NOT(ISBLANK(Email)), OR(NOT(CONTAINS(Email, "@")), NOT(CONTAINS(RIGHT(Email, LEN(Email) - FIND("@", Email)), ".")), CONTAINS(Email, " "), CONTAINS(Email, ".."), CONTAINS(Email, "@@")))</errorConditionFormula>
     <errorDisplayField>Email</errorDisplayField>
     <errorMessage>Email address is not in a valid format. Cleanse the source email before migrating (check for a missing @, missing domain dot, spaces, or double dots).</errorMessage>
 </ValidationRule>

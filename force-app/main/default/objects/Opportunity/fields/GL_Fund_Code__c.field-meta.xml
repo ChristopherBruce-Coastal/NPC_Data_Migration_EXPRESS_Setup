@@ -2,33 +2,32 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>GL_Fund_Code__c</fullName>
     <label>GL Fund Code</label>
-    <type>Picklist</type>
     <required>false</required>
-    <trackFeedHistory>false</trackFeedHistory>
+    <type>Picklist</type>
     <valueSet>
         <restricted>true</restricted>
         <valueSetDefinition>
             <sorted>false</sorted>
-            <value>
-                <fullName>FUND-100-GEN</fullName>
-                <default>false</default>
-                <label>FUND-100-GEN</label>
-            </value>
-            <value>
-                <fullName>FUND-210-SCHOL</fullName>
-                <default>false</default>
-                <label>FUND-210-SCHOL</label>
-            </value>
-            <value>
-                <fullName>FUND-320-BLUETECH</fullName>
-                <default>false</default>
-                <label>FUND-320-BLUETECH</label>
-            </value>
-            <value>
-                <fullName>FUND-410-CAPITAL</fullName>
-                <default>false</default>
-                <label>FUND-410-CAPITAL</label>
-            </value>
+                <value>
+                    <fullName>FUND-100-GEN</fullName>
+                    <default>false</default>
+                    <label>FUND-100-GEN</label>
+                </value>
+                <value>
+                    <fullName>FUND-210-SCHOL</fullName>
+                    <default>false</default>
+                    <label>FUND-210-SCHOL</label>
+                </value>
+                <value>
+                    <fullName>FUND-320-BLUETECH</fullName>
+                    <default>false</default>
+                    <label>FUND-320-BLUETECH</label>
+                </value>
+                <value>
+                    <fullName>FUND-410-CAPITAL</fullName>
+                    <default>false</default>
+                    <label>FUND-410-CAPITAL</label>
+                </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

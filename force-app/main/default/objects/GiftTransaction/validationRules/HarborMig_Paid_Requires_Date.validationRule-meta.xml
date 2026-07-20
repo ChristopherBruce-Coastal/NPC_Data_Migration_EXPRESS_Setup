@@ -3,7 +3,7 @@
     <fullName>HarborMig_Paid_Requires_Date</fullName>
     <active>true</active>
     <description>Tier-2 (F10): a Paid GiftTransaction must have a TransactionDate. Seed-safe.</description>
-    <errorConditionFormula>AND(&#10;  ISPICKVAL(Status, "Paid"),&#10;  ISBLANK(TransactionDate)&#10;)</errorConditionFormula>
+    <errorConditionFormula>AND(ISPICKVAL(Status, "Paid"), ISBLANK(TransactionDate))</errorConditionFormula>
     <errorDisplayField>TransactionDate</errorDisplayField>
     <errorMessage>A Paid gift transaction must have a Transaction Date. If this is an unpaid or scheduled pledge, set the correct Status rather than migrating it as Paid with a blank date.</errorMessage>
 </ValidationRule>

@@ -117,14 +117,37 @@ listed above for verification; they load as part of the relational chain.
 > counts may be slightly higher if your org already contained sample records before the
 > seed; they should never be lower than the numbers above.
 
-Verify in the Developer Console Query Editor, for example:
+Verify in the Developer Console Query Editor. Run each of these and compare against the
+targets above:
 
 ```sql
 SELECT RecordType.Name, COUNT(Id) FROM Account GROUP BY RecordType.Name
 ```
+```sql
+SELECT COUNT() FROM Account
+```
+```sql
+SELECT COUNT() FROM Contact
+```
+```sql
+SELECT COUNT() FROM Lead
+```
+```sql
+SELECT COUNT() FROM Opportunity
+```
+```sql
+SELECT COUNT() FROM GiftTransaction
+```
+```sql
+SELECT COUNT() FROM Deliverable__c
+```
 
-Any object whose count falls below its target indicates a data or setup problem worth
-reporting to your instructor.
+The first query breaks Account down by record type (business vs. person); the total should
+be 1,200. Counts equal to or greater than the targets are healthy. Any object whose count
+falls below its target indicates a data or setup problem worth reporting to your instructor.
+
+> Account-Contact relationships are not directly queryable by object name in a Nonprofit
+> Cloud org, so there is no count query for them here.
 
 ## Troubleshooting
 

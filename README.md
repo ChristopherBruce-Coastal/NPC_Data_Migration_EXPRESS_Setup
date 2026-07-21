@@ -10,10 +10,10 @@ You (the learner) deploy this package yourself as part of environment setup.
 ## How the seed works (and what it leaves behind)
 
 The dataset ships as CSV static resources. A Queueable Apex loader inserts the records
-in FR-5 relational order (Account -> Contact -> AccountContactRelation -> Lead ->
+in relational order (Account -> Contact -> AccountContactRelation -> Lead ->
 Opportunity -> GiftTransaction -> Deliverable__c) and resolves every foreign key
 **in memory**: CSV row keys are mapped to the inserted record Ids and are never written
-to any field.
+to any field. After the seed, the org contains no migration scaffolding.
 
 The loader is one-shot per org: it refuses to run if EXPRESS data already exists.
 To start over, request a fresh training org.
@@ -61,8 +61,8 @@ Complete these in order. Each step depends on the one before it.
    ```
 
    The loader prechecks your setup and throws a plain-English message if a step was missed.
-   Progress appears under Setup > Apex Jobs; a per-object summary is emailed to you when
-   the chain finishes.
+   Progress and completion are tracked under **Setup > Apex Jobs** (the seed runs as a
+   chain of four jobs; when all four show Completed, the seed is done).
 
 ## Deploy
 
@@ -88,12 +88,12 @@ If the button still fails after these steps, it is a known limitation of the com
 deploy tool with certain org configurations. Contact your instructor; an alternative
 install method may be provided.
 
-## What gets deployed (metadata)
+## What gets deployed
 
 | Component | Purpose |
 |---|---|
 | `Deliverable__c` object + fields + tab | Custom object per the Deliverable schema doc (date, currency, long text fields) |
-| `EIN__c` (Account), `GL_Fund_Code__c` (Opportunity) | Scenario fields used for FR-1.2 matching and FR-2.2 designations |
+| `EIN__c` (Account), `GL_Fund_Code__c` (Opportunity) | Scenario fields used for matching and designations |
 | `Designation_GL_Code__c` + `Source_Opportunity__c` (GiftTransaction) | Preserves designation codes and the legacy gift-to-opportunity link |
 | `OpportunityStage` + `LeadStatus` standard value sets | Aligns stages/statuses with the dataset (WARNING: replaces the org's existing values; fine for disposable training orgs) |
 | `CoastieEdTrainingDataLoader` Apex (+ tests) | Precheck + one-shot queueable seed chain |
@@ -106,7 +106,16 @@ NPC org.
 
 ## Expected record counts after the seed
 
-Account 1200 | Contact 800 | AccountContactRelation 400 | Lead 500 | Opportunity 1700 | GiftTransaction 1744 | Deliverable__c 500
+Account 1200 | Contact 1707 | Lead 500 | Opportunity 1700 | GiftTransaction 1744 | Deliverable__c 500
+
+The seed also loads 400 Account-Contact relationships (secondary contact roles). These
+are not directly queryable by object name in a Nonprofit Cloud org, so they are not
+listed above for verification; they load as part of the relational chain.
+
+> Contact totals 1707 because each seeded individual (Person Account) automatically
+> creates its own Contact (800 business contacts + 900 person-account contacts). Your
+> counts may be slightly higher if your org already contained sample records before the
+> seed; they should never be lower than the numbers above.
 
 Verify in the Developer Console Query Editor, for example:
 
@@ -114,21 +123,20 @@ Verify in the Developer Console Query Editor, for example:
 SELECT RecordType.Name, COUNT(Id) FROM Account GROUP BY RecordType.Name
 ```
 
-The summary email's per-object line is the authoritative result. Any object where
-`success` is below its target, or where `skippedMissingParent` or `parseErrors` is
-nonzero, indicates a data or setup problem worth reporting to your instructor.
+Any object whose count falls below its target indicates a data or setup problem worth
+reporting to your instructor.
 
 ## Troubleshooting
 
-- **`SETUP INCOMPLETE: Person Accounts is not enabled`**: complete step 2 before running the loader.
+- **`SETUP INCOMPLETE: No Person Account record type`**: you are not in an NPC org with Person Accounts enabled; complete step 2 or get the correct training org.
 - **`SETUP INCOMPLETE: No active "Business Account" record type`**: complete step 2.1. The record type label/developer name must match `Business Account` / `Business_Account`.
-- **`SETUP INCOMPLETE: No Person Account record type`**: you are not in an NPC org with Person Accounts; get the correct training org.
 - **`ALREADY SEEDED`**: the seed ran before in this org. Use a fresh org.
-- **GiftTransaction step reports SKIPPED or errors**: Fundraising is not enabled (step 3), the Fundraising Admin permission set is not assigned (step 6), or the Fundraising Access permission set license is not assigned (step 7).
+- **GiftTransaction step reports SKIPPED or errors**: Fundraising is not enabled (step 3) or the Fundraising Admin permission set group is not assigned (step 4).
 - **StandardValueSet warning on deploy**: deploying `OpportunityStage`/`LeadStatus` replaces the full org value sets. Intended for disposable training orgs only.
+- **The seed did not appear to finish**: check **Setup > Apex Jobs**. The seed runs as four chained jobs; all four should show Completed. If a job shows Failed, open it for the error.
 
-## Regenerating the CSVs
+## Regenerating the dataset
 
-The dataset is reproducible from `gen_target2.py` (seed `20260706`) in the EXPRESS
-curriculum workspace. The SOURCE (defective) dataset is intentionally NOT in this
-repo; it is distributed to learners as a workbook, not loaded to the org.
+The TARGET dataset and metadata are reproducible from the builder scripts in the EXPRESS
+curriculum workspace (seed `20260706`). The SOURCE (defective) dataset is intentionally
+NOT in this repo; it is distributed to learners as a workbook, not loaded to the org.

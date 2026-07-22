@@ -24,7 +24,7 @@
         <default>false</default>
         <label>Awarded</label>
         <closed>false</closed>
-        <forecastCategory>Forecast</forecastCategory>
+        <forecastCategory>Commit</forecastCategory>
         <probability>90</probability>
         <won>false</won>
     </standardValue>

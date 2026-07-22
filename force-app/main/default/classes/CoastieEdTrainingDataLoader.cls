@@ -93,6 +93,10 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
 
     /** Entry point. Validates prerequisites, then enqueues the first load phase. */
     public static Id run() {
+        Migration_Settings__c bypassMs = Migration_Settings__c.getOrgDefaults();
+            bypassMs.Bypass_Automation__c = true;
+        upsert bypassMs;
+
         String problem = precheck();
         if (problem != null) {
             throw new LoaderException(problem);
@@ -338,6 +342,9 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
     }
 
     private static void finish(String summary) {
+        Migration_Settings__c resetMs = Migration_Settings__c.getOrgDefaults();
+            resetMs.Bypass_Automation__c = false;
+        upsert resetMs;
         System.debug(LoggingLevel.INFO, 'Coastie-Ed training data seed complete:\n' + summary);
         try {
             Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();

@@ -24,13 +24,28 @@ Complete these in order. Each step depends on the one before it.
 
 1. **Create your base NPC org.** [Get your Nonprofit Cloud training org per the course guide *(Ctrl+Click or Cmd+Click(Mac) to open in a new tab)*.](https://www.salesforce.com/form/sfdo/signup/nonprofit/nonprofit-cloud-base-trial/?noskip=true)
 
-2. **Enable Person Accounts.** Setup > search "Person Accounts" > follow the enablement
-   steps. This is irreversible in a standard org, which is fine for a disposable training org.
-   1. **Create a "Business Account" record type on Account.** Setup > Object Manager >
-      Account > Record Types > New. Label it exactly `Business Account` (developer name
-      `Business_Account`), activate it, and make it available to your profile. The loader
-      checks for this record type by name and refuses to run without it. Seeded business
-      accounts get this record type; seeded individuals get the org's Person Account record type.
+2. **Enable Person Accounts (complete ALL four sub-steps — this is the most common place setup goes wrong).**
+   Person Account enablement is a multi-step flow, and one sub-step opens a **new browser tab**.
+   You are not finished until you have returned to the original tab and clicked the final
+   Enable button. Enabling Person Accounts is irreversible in a standard org, which is fine
+   for a disposable training org.
+   1. **Open the Person Accounts setup page.** Setup > Quick Find > "Person Accounts" >
+      under Feature Settings > Accounts, click **Person Accounts**.
+   2. **Acknowledge org impact.** Under *Step 1: Org Impact Acknowledgement*, click
+      **View Org Impacts**, review the modal, and click **Continue**.
+   3. **Create the Business Account record type.** Under *Step 2: Create Accounts Record Type*,
+      click **Set Up** — this opens Object Manager in a **new tab**. Click **New**, enter
+      `Business Account` as the Record Type Label (Record Type Name auto-fills as
+      `Business_Account`), keep **Active** checked, set profile visibility, click **Next**,
+      choose a page layout, and click **Save**. The loader checks for this record type by
+      name and refuses to run without it.
+   4. **Return to the original tab and finish enabling.** Switch back to the Person Accounts
+      setup tab, **refresh the page**, and confirm both steps show green checkmarks. Then
+      click **Enable Person Accounts** (bottom-right) and click **Enable** in the confirmation
+      dialog. **You must see the "Successfully enabled Person Accounts" banner** — if you do
+      not, Person Accounts is not enabled and the package will fail to deploy (see the
+      `IsPersonType` note in Troubleshooting). Do not proceed to deploy until you see that banner.
+
 
 3. **Enable Fundraising.** Setup > search "Fundraising" > turn on Fundraising so the
    GiftTransaction object and its fields exist. Without this, the GiftTransaction step
@@ -47,11 +62,10 @@ Complete these in order. Each step depends on the one before it.
 6. **Deploy this package from GitHub.** Use the Deploy button below. See
    [Deploy](#deploy) for the button and troubleshooting.
 
-7. **Assign the permission sets to your user.** Setup > Permission Sets, then for each
-   of **EXPRESS Training Data Admin** and **Fundraising Admin**: open it > Manage
-   Assignments > Add Assignment > select your user > Assign. EXPRESS Training Data Admin
-   grants access to the custom object, fields, and the loader; Fundraising Admin grants
-   access to the Fundraising objects the seed writes to.
+7. **Assign the EXPRESS Training Data Admin permission set to your user.** Setup >
+   Permission Sets > **EXPRESS Training Data Admin** > Manage Assignments > Add Assignment >
+   select your user > Assign. This grants access to the custom object, fields, and the loader.
+   (Fundraising access was already granted in step 4 via the Fundraising Admin permission set group.)
 
 8. **Run the seed.** Open the Developer Console > Debug > Open Execute Anonymous Window,
    paste the following, and execute:
@@ -151,8 +165,13 @@ falls below its target indicates a data or setup problem worth reporting to your
 
 ## Troubleshooting
 
+- **Deploy fails with `No such column 'IsPersonType' on entity 'RecordType'`** (and a cascade
+  error about no ApexClass named `CoastieEdTrainingDataLoader`): Person Accounts enablement was
+  not completed. The `IsPersonType` field only exists once Person Accounts is fully enabled.
+  Return to step 2, finish all four sub-steps (especially clicking **Enable Person Accounts**
+  on the original tab and confirming the success banner), then redeploy.
 - **`SETUP INCOMPLETE: No Person Account record type`**: you are not in an NPC org with Person Accounts enabled; complete step 2 or get the correct training org.
-- **`SETUP INCOMPLETE: No active "Business Account" record type`**: complete step 2.1. The record type label/developer name must match `Business Account` / `Business_Account`.
+- **`SETUP INCOMPLETE: No active "Business Account" record type`**: complete step 2, sub-step 3. The record type label/developer name must match `Business Account` / `Business_Account`.
 - **`ALREADY SEEDED`**: the seed ran before in this org. Use a fresh org.
 - **GiftTransaction step reports SKIPPED or errors**: Fundraising is not enabled (step 3) or the Fundraising Admin permission set group is not assigned (step 4).
 - **StandardValueSet warning on deploy**: deploying `OpportunityStage`/`LeadStatus` replaces the full org value sets. Intended for disposable training orgs only.

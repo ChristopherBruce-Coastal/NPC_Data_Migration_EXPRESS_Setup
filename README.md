@@ -67,8 +67,15 @@ Complete these in order. Each step depends on the one before it.
    select your user > Assign. This grants access to the custom object, fields, and the loader.
    (Fundraising access was already granted in step 4 via the Fundraising Admin permission set group.)
 
-8. **Run the seed.** Open the Developer Console > Debug > Open Execute Anonymous Window,
-   paste the following, and execute:
+8. **Run the seed.**
+
+   *New to the Developer Console?* Open it from the **gear icon** in the top-right of Salesforce
+   Setup — click the gear, then **Developer Console**. It opens in a new window. (If you don't see
+   it under the gear, your user may need the "Author Apex" permission; the EXPRESS Training Data
+   Admin permission set from step 7 covers this.)
+
+   In the Developer Console, go to **Debug > Open Execute Anonymous Window**, paste the following,
+   and click **Execute**:
 
    ```apex
    CoastieEdTrainingDataLoader.run();
@@ -131,8 +138,9 @@ listed above for verification; they load as part of the relational chain.
 > counts may be slightly higher if your org already contained sample records before the
 > seed; they should never be lower than the numbers above.
 
-Verify in the Developer Console Query Editor. Run each of these and compare against the
-targets above:
+Verify in the Developer Console Query Editor (open the Developer Console from the Setup **gear
+icon > Developer Console**, then use the **Query Editor** tab at the bottom). Run each of these
+and compare against the targets above:
 
 ```sql
 SELECT RecordType.Name, COUNT(Id) FROM Account GROUP BY RecordType.Name

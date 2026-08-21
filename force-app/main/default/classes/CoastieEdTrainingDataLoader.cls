@@ -3,17 +3,30 @@
  * Seeds the SYNTHETIC Coastie-Ed TARGET dataset (EXPRESS Data Migration training)
  * from CSV static resources into the learner's NPC training org, in FR-5 order.
  *
- * Usage (anonymous Apex): CoastieEdTrainingDataLoader.run();
+ * Usage (anonymous Apex):
+ *   CoastieEdTrainingDataLoader.checkSetup();   // read-only, verifies setup, changes nothing
+ *   CoastieEdTrainingDataLoader.run();          // seeds the org, ONE-SHOT
  *
  * Design notes:
  * - NO external ID fields are used or persisted. CSV rows carry a '#Key' column;
  *   the loader maps keys to inserted record Ids in memory and resolves
  *   'Ref:<LookupField>:<ParentObject>' columns from those maps. After the seed,
  *   the org contains no migration scaffolding.
- * - Prechecks: Person Account record type must exist (NPC org with Person
- *   Accounts), a Business Account record type must exist (learners create this
- *   during setup), and the org must not already be seeded. run() throws with a
- *   clear message if any precheck fails.
+ * - Prechecks, in README setup order so the earliest missed step is named first:
+ *   a Person Account record type must exist (NPC org with Person Accounts); a
+ *   Business Account record type must exist (learners create this during setup);
+ *   Fundraising must be on AND GiftTransaction createable by the running user;
+ *   State and Country/Territory Picklists must be enabled; "Allow users to relate
+ *   a contact to multiple accounts" must be enabled; and the org must not already
+ *   be seeded. run() throws with a clear message if any precheck fails.
+ * - Every precheck message MUST contain the literal "SETUP INCOMPLETE" or
+ *   "ALREADY SEEDED". CoastieEdTrainingDataLoaderTest asserts that, deliberately,
+ *   so the test passes in any org state and a missing setup step can never turn
+ *   into an opaque test failure that blocks the deploy.
+ * - The setting checks are resolved DYNAMICALLY for the same reason GiftTransaction
+ *   is: the objects and fields they test do not exist until the setting is on, and a
+ *   compile-time reference would stop this class compiling in exactly the orgs the
+ *   prechecks are meant to diagnose.
  * - Insert-based and therefore one-shot per org. To reseed, use a fresh
  *   training org (or scripts/reset-data.apex, best effort).
  * - Fully dynamic (no compile-time reference to GiftTransaction), so the class
@@ -104,6 +117,26 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         return System.enqueueJob(new CoastieEdTrainingDataLoader(0, '', new Map<String, Map<String, Id>>()));
     }
 
+    /**
+     * Read-only setup verification. Runs exactly the same prechecks as run() and nothing
+     * else: no DML, no bypass flag, no seed. Throws the learner-facing message for the
+     * first missed step so it surfaces directly in the Execute Anonymous result, the same
+     * way the documented SETUP INCOMPLETE messages already do. Debugs 'SETUP OK' when the
+     * org is ready.
+     *
+     * Deliberately separate from run(). "Is my org configured correctly" and "load the
+     * dataset" are different questions, only the second is one-shot per org, and a
+     * facilitator needs a way to ask the first without the learner attempting the second.
+     */
+    public static void checkSetup() {
+        String problem = precheck();
+        if (problem != null) {
+            throw new LoaderException(problem);
+        }
+        System.debug(LoggingLevel.ERROR,
+            'SETUP OK: every setup step verified. Run CoastieEdTrainingDataLoader.run(); to seed.');
+    }
+
     /** Returns null when the org is ready to seed, otherwise a learner-facing message. */
     @TestVisible
     private static String precheck() {
@@ -115,6 +148,21 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             return 'SETUP INCOMPLETE: No active "Business Account" record type found on Account. '
                 + 'Create an Account record type labeled exactly "Business Account" (per the setup guide), '
                 + 'activate it, then re-run the loader.';
+        }
+        String fundraising = fundraisingReadiness();
+        if (fundraising != null) {
+            return fundraising;
+        }
+        if (!stateCountryPicklistsEnabled()) {
+            return 'SETUP INCOMPLETE: State and Country/Territory Picklists are not enabled. '
+                + 'Setup > Quick Find > "State and Country/Territory Picklists" > enable and complete '
+                + 'the conversion, then re-run the loader. The dataset writes to the picklist code fields.';
+        }
+        if (!contactsToMultipleAccountsEnabled()) {
+            return 'SETUP INCOMPLETE: "Allow users to relate a contact to multiple accounts" is not '
+                + 'enabled. Setup > Quick Find > Account Settings > Edit > check "Allow users to relate '
+                + 'a contact to multiple accounts" > Save, then re-run the loader. Without it the 400 '
+                + 'secondary Account-Contact relationships cannot load.';
         }
         Integer seeded = [SELECT COUNT() FROM Account WHERE Website LIKE '%.example.org'];
         if (seeded > 0) {
@@ -143,6 +191,54 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             LIMIT 1
         ];
         return rts.isEmpty() ? null : rts[0].Id;
+    }
+
+    /**
+     * Null when GiftTransaction can actually be loaded by the running user, otherwise a
+     * learner-facing message. Tests the CAPABILITY rather than the configuration path:
+     * a missing object means Fundraising is off (README step 3), and a present but
+     * non-createable object means the Fundraising Admin permission set group is not
+     * assigned (README step 4). Checking the effect avoids depending on that group's
+     * DeveloperName, which is not ours to guarantee.
+     */
+    @TestVisible
+    private static String fundraisingReadiness() {
+        Schema.SObjectType gt = Schema.getGlobalDescribe().get('GiftTransaction');
+        if (gt == null) {
+            return 'SETUP INCOMPLETE: Fundraising is not enabled, so the GiftTransaction object does '
+                + 'not exist in this org. Setup > Quick Find > "Fundraising" > turn on Fundraising, '
+                + 'then re-run the loader.';
+        }
+        if (!gt.getDescribe().isCreateable()) {
+            return 'SETUP INCOMPLETE: GiftTransaction exists but your user cannot create it. Assign the '
+                + '"Fundraising Admin" permission set group: Setup > Users > your user > Permission Set '
+                + 'Group Assignments > Edit Assignments > enable Fundraising Admin > Save, then re-run '
+                + 'the loader.';
+        }
+        return null;
+    }
+
+    /**
+     * True when State and Country/Territory Picklists are enabled. The *Code fields only
+     * exist once the conversion is complete, so their presence is the signal. Read from
+     * the field map by lowercase key rather than referenced directly, so this class still
+     * compiles in an org where the picklists are off.
+     */
+    @TestVisible
+    private static Boolean stateCountryPicklistsEnabled() {
+        return Schema.SObjectType.Account.fields.getMap().containsKey('billingstatecode');
+    }
+
+    /**
+     * True when "Allow users to relate a contact to multiple accounts" is enabled.
+     * AccountContactRelation is not a loadable object until that setting is on, so a
+     * compile-time reference here would break this class in an org where it is off,
+     * the same failure shape as the IsPersonType cascade in the README's troubleshooting.
+     */
+    @TestVisible
+    private static Boolean contactsToMultipleAccountsEnabled() {
+        Schema.SObjectType acr = Schema.getGlobalDescribe().get('AccountContactRelation');
+        return acr != null && acr.getDescribe().isCreateable();
     }
 
     public void execute(QueueableContext ctx) {

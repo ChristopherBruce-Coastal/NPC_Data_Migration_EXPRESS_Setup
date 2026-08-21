@@ -59,31 +59,56 @@ Complete these in order. Each step depends on the one before it.
    Picklists" > enable. The dataset uses state and country values; the loader writes to the
    picklist code fields when this is on.
 
-6. **Deploy this package from GitHub.** Use the Deploy button below. See
+6. **Enable "Allow users to relate a contact to multiple accounts."** Setup > Quick Find >
+   "Account Settings" > **Edit** > check **Allow users to relate a contact to multiple accounts**
+   > **Save**. **The seed's 400 Account-Contact relationships cannot load without this**, and the
+   loader will refuse to run until it is on. Like Person Accounts, enabling it is irreversible in a
+   standard org, which is fine for a disposable training org.
+
+7. **Deploy this package from GitHub.** Use the Deploy button below. See
    [Deploy](#deploy) for the button and troubleshooting.
 
-7. **Assign the EXPRESS Training Data Admin permission set to your user.** Setup >
+8. **Assign the EXPRESS Training Data Admin permission set to your user.** Setup >
    Permission Sets > **EXPRESS Training Data Admin** > Manage Assignments > Add Assignment >
    select your user > Assign. This grants access to the custom object, fields, and the loader.
    (Fundraising access was already granted in step 4 via the Fundraising Admin permission set group.)
 
-8. **Run the seed.**
+9. **Verify your setup before you seed.**
 
    *New to the Developer Console?* Open it from the **gear icon** in the top-right of Salesforce
    Setup — click the gear, then **Developer Console**. It opens in a new window. (If you don't see
    it under the gear, your user may need the "Author Apex" permission; the EXPRESS Training Data
-   Admin permission set from step 7 covers this.)
+   Admin permission set from step 8 covers this.)
 
-   In the Developer Console, go to **Debug > Open Execute Anonymous Window**, paste the following,
-   and click **Execute**:
+   In the Developer Console, go to **Debug > Open Execute Anonymous Window**, tick **Open Log**,
+   paste the following, and click **Execute**:
 
    ```apex
-   CoastieEdTrainingDataLoader.run();
+   CoastieEdTrainingDataLoader.checkSetup();
    ```
 
-   The loader prechecks your setup and throws a plain-English message if a step was missed.
-   Progress and completion are tracked under **Setup > Apex Jobs** (the seed runs as a
-   chain of four jobs; when all four show Completed, the seed is done).
+   This checks every step above and **changes nothing in your org**.
+
+   - **If a step was missed**, an error appears immediately naming it. Fix that step, then run
+     this again. Repeat until it passes.
+   - **If your setup is complete**, execution finishes with **no error**. That is the pass
+     signal. To see it stated outright, look in the log that opens for `SETUP OK`.
+
+   The next step is **one-shot per org**: the seed refuses to run twice, and to start over you
+   need a fresh training org. Confirm this step passes first.
+
+10. **Run the seed.**
+
+    In the same Execute Anonymous window, replace the line with the following and click **Execute**:
+
+    ```apex
+    CoastieEdTrainingDataLoader.run();
+    ```
+
+    The loader re-runs the same checks before it starts, so a step missed after step 9 still stops
+    it here rather than seeding a half-configured org.
+    Progress and completion are tracked under **Setup > Apex Jobs** (the seed runs as a
+    chain of four jobs; when all four show Completed, the seed is done).
 
 ## Deploy
 
@@ -129,9 +154,10 @@ NPC org.
 
 Account 1200 | Contact 1707 | Lead 500 | Opportunity 1700 | GiftTransaction 1744 | Deliverable__c 500
 
-The seed also loads 400 Account-Contact relationships (secondary contact roles). These
-are not directly queryable by object name in a Nonprofit Cloud org, so they are not
-listed above for verification; they load as part of the relational chain.
+The seed also loads **400 secondary Account-Contact relationships** (`AccountContactRelation`
+rows with `IsDirect = false`). These are separate from the direct relationship every Contact
+already has with its own Account, so **count them on `IsDirect = false`** or the number will not
+match.
 
 > Contact totals 1707 because each seeded individual (Person Account) automatically
 > creates its own Contact (800 business contacts + 900 person-account contacts). Your
@@ -163,15 +189,22 @@ SELECT COUNT() FROM GiftTransaction
 ```sql
 SELECT COUNT() FROM Deliverable__c
 ```
+```sql
+SELECT COUNT() FROM AccountContactRelation WHERE IsDirect = false
+```
 
 The first query breaks Account down by record type (business vs. person); the total should
 be 1,200. Counts equal to or greater than the targets are healthy. Any object whose count
 falls below its target indicates a data or setup problem worth reporting to your instructor.
 
-> Account-Contact relationships are not directly queryable by object name in a Nonprofit
-> Cloud org, so there is no count query for them here.
+> The Account-Contact relationship count should be **400**. A result of **0** means step 6 was
+> skipped: the relationships had nowhere to load, and **the seed still reported success**, because
+> the loader does not fail a job on individual row errors. Enable the setting and use a fresh org.
 
 ## Troubleshooting
+
+Every `SETUP INCOMPLETE` message below is also what `CoastieEdTrainingDataLoader.checkSetup();`
+(step 9) reports, so you can re-check after a fix without attempting a seed.
 
 - **Deploy fails with `No such column 'IsPersonType' on entity 'RecordType'`** (and a cascade
   error about no ApexClass named `CoastieEdTrainingDataLoader`): Person Accounts enablement was
@@ -180,6 +213,10 @@ falls below its target indicates a data or setup problem worth reporting to your
   on the original tab and confirming the success banner), then redeploy.
 - **`SETUP INCOMPLETE: No Person Account record type`**: you are not in an NPC org with Person Accounts enabled; complete step 2 or get the correct training org.
 - **`SETUP INCOMPLETE: No active "Business Account" record type`**: complete step 2, sub-step 3. The record type label/developer name must match `Business Account` / `Business_Account`.
+- **`SETUP INCOMPLETE: Fundraising is not enabled`**: complete step 3.
+- **`SETUP INCOMPLETE: GiftTransaction exists but your user cannot create it`**: complete step 4, the Fundraising Admin permission set group.
+- **`SETUP INCOMPLETE: State and Country/Territory Picklists are not enabled`**: complete step 5, including the conversion.
+- **`SETUP INCOMPLETE: "Allow users to relate a contact to multiple accounts" is not enabled`**: complete step 6. If you have already seeded without it, the 400 secondary Account-Contact relationships did not load and the seed reported success anyway. Enable the setting and use a fresh org.
 - **`ALREADY SEEDED`**: the seed ran before in this org. Use a fresh org.
 - **GiftTransaction step reports SKIPPED or errors**: Fundraising is not enabled (step 3) or the Fundraising Admin permission set group is not assigned (step 4).
 - **StandardValueSet warning on deploy**: deploying `OpportunityStage`/`LeadStatus` replaces the full org value sets. Intended for disposable training orgs only.

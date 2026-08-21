@@ -65,20 +65,25 @@ Complete these in order. Each step depends on the one before it.
    loader will refuse to run until it is on. Like Person Accounts, enabling it is irreversible in a
    standard org, which is fine for a disposable training org.
 
-7. **Deploy this package from GitHub.** Use the Deploy button below. See
+7. **Add "Wire" to the Gift Transaction Payment Method picklist.** Setup > Object Manager >
+   **Gift Transaction** > Fields & Relationships > **Payment Method** > under *Payment Method
+   Picklist Values* click **New** > enter `Wire` > **Save**. Part of the seed dataset uses this
+   value and the loader will refuse to run until it is present. Leave the picklist restricted.
+
+8. **Deploy this package from GitHub.** Use the Deploy button below. See
    [Deploy](#deploy) for the button and troubleshooting.
 
-8. **Assign the EXPRESS Training Data Admin permission set to your user.** Setup >
+9. **Assign the EXPRESS Training Data Admin permission set to your user.** Setup >
    Permission Sets > **EXPRESS Training Data Admin** > Manage Assignments > Add Assignment >
    select your user > Assign. This grants access to the custom object, fields, and the loader.
    (Fundraising access was already granted in step 4 via the Fundraising Admin permission set group.)
 
-9. **Verify your setup before you seed.**
+10. **Verify your setup before you seed.**
 
    *New to the Developer Console?* Open it from the **gear icon** in the top-right of Salesforce
    Setup — click the gear, then **Developer Console**. It opens in a new window. (If you don't see
    it under the gear, your user may need the "Author Apex" permission; the EXPRESS Training Data
-   Admin permission set from step 8 covers this.)
+   Admin permission set from step 9 covers this.)
 
    In the Developer Console, go to **Debug > Open Execute Anonymous Window**, tick **Open Log**,
    paste the following, and click **Execute**:
@@ -97,7 +102,7 @@ Complete these in order. Each step depends on the one before it.
    The next step is **one-shot per org**: the seed refuses to run twice, and to start over you
    need a fresh training org. Confirm this step passes first.
 
-10. **Run the seed.**
+11. **Run the seed.**
 
     In the same Execute Anonymous window, replace the line with the following and click **Execute**:
 
@@ -105,7 +110,7 @@ Complete these in order. Each step depends on the one before it.
     CoastieEdTrainingDataLoader.run();
     ```
 
-    The loader re-runs the same checks before it starts, so a step missed after step 9 still stops
+    The loader re-runs the same checks before it starts, so a step missed after step 10 still stops
     it here rather than seeding a half-configured org.
     Progress and completion are tracked under **Setup > Apex Jobs** (the seed runs as a
     chain of four jobs; when all four show Completed, the seed is done).
@@ -204,7 +209,7 @@ falls below its target indicates a data or setup problem worth reporting to your
 ## Troubleshooting
 
 Every `SETUP INCOMPLETE` message below is also what `CoastieEdTrainingDataLoader.checkSetup();`
-(step 9) reports, so you can re-check after a fix without attempting a seed.
+(step 10) reports, so you can re-check after a fix without attempting a seed.
 
 - **Deploy fails with `No such column 'IsPersonType' on entity 'RecordType'`** (and a cascade
   error about no ApexClass named `CoastieEdTrainingDataLoader`): Person Accounts enablement was
@@ -217,6 +222,7 @@ Every `SETUP INCOMPLETE` message below is also what `CoastieEdTrainingDataLoader
 - **`SETUP INCOMPLETE: GiftTransaction exists but your user cannot create it`**: complete step 4, the Fundraising Admin permission set group.
 - **`SETUP INCOMPLETE: State and Country/Territory Picklists are not enabled`**: complete step 5, including the conversion.
 - **`SETUP INCOMPLETE: "Allow users to relate a contact to multiple accounts" is not enabled`**: complete step 6. If you have already seeded without it, the 400 secondary Account-Contact relationships did not load and the seed reported success anyway. Enable the setting and use a fresh org.
+- **`SETUP INCOMPLETE: The "Wire" value is missing from Gift Transaction > Payment Method`**: complete step 7. Add the value exactly as `Wire`, capital W, and leave the picklist restricted. Without it part of the seed dataset silently fails to load and the seed still reports success.
 - **`ALREADY SEEDED`**: the seed ran before in this org. Use a fresh org.
 - **GiftTransaction step reports SKIPPED or errors**: Fundraising is not enabled (step 3) or the Fundraising Admin permission set group is not assigned (step 4).
 - **StandardValueSet warning on deploy**: deploying `OpportunityStage`/`LeadStatus` replaces the full org value sets. Intended for disposable training orgs only.

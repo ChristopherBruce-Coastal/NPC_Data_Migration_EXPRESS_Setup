@@ -18,19 +18,40 @@ to any field. After the seed, the org contains no migration scaffolding.
 The loader is one-shot per org: it refuses to run if EXPRESS data already exists.
 To start over, request a fresh training org (step 1).
 
-## Before you start: take a record census
+## How you will verify the seed (read this before you start)
 
-**Do this first, before you deploy anything.** Your training org almost certainly arrives
-with records already in it, so the way to verify the seed is to compare counts **before and
-after** and check the difference. An absolute total tells you nothing: if your org starts
+**You verify by measuring the change, not the total.** Your training org almost certainly
+arrives with records already in it, so an absolute count proves nothing: if your org starts
 with 13,588 gift transactions, a post-seed total of 14,896 is comfortably "more than 1,744"
-and still means 436 rows failed to load.
+and still means 436 rows failed to load. That has happened.
 
-Run `scripts/census.apex` with `MODE = 'BEFORE'` in the Developer Console (Debug > Open
-Execute Anonymous Window, tick **Open Log**). It changes nothing. Copy the `BASELINE` block
-it prints and keep it: you will paste it back in at step 10.
+So you will take a record count **before** seeding, seed, count **again**, and compare the
+difference against a fixed table. `scripts/census.apex` does the counting and the comparison.
+You run it at step 10, once before the seed and once after.
 
-**This window exists once per org.** Once you have seeded, you cannot recover the baseline.
+**The "before" reading exists once per org.** Once you have seeded you cannot recover it, so
+do not skip ahead to `run()`.
+
+### Running anonymous Apex (you will do this three times)
+
+**You need no local tooling for this program.** No git clone, no VS Code, no Salesforce CLI.
+Everything runs in the browser.
+
+The census script and the two loader commands are all **anonymous Apex**: you paste the code
+into a window and execute it. You do not "call" a script file.
+
+1. Click the **gear icon** (top right of Setup) > **Developer Console**. It opens in a new window.
+2. **Debug > Open Execute Anonymous Window.**
+3. Tick **Open Log**.
+4. Paste the code in. For a one-line command, just type it. For the census script, open it in
+   your browser at the raw link below, select all, copy, paste:
+   [scripts/census.apex (raw)](https://raw.githubusercontent.com/ChristopherBruce-Coastal/NPC_Data_Migration_EXPRESS_Setup/main/scripts/census.apex)
+5. Click **Execute**, then read the log that opens.
+
+> **Output appears tagged `|ERROR|`, and that is not an error.** Apex `System.debug()`
+> defaults to a level that a standard trace flag filters out, so both the loader and the
+> census script deliberately log at ERROR level to guarantee their output survives. A line
+> reading `USER_DEBUG [143]|ERROR|SETUP OK: ...` is a **success** message.
 
 ## Setup order (do not skip ahead)
 
@@ -144,9 +165,20 @@ Complete these in order. Each step depends on the one before it.
    need a fresh training org. Confirm this step passes first, and confirm you have your
    `BEFORE` census from the section above.
 
-10. **Run the seed, then check the deltas.**
+10. **Take the "before" count, seed, then check the deltas.** Three executions, in order.
 
-    In the same Execute Anonymous window, replace the line with the following and click **Execute**:
+    **10a. Before count.** Open the
+    [raw census script](https://raw.githubusercontent.com/ChristopherBruce-Coastal/NPC_Data_Migration_EXPRESS_Setup/main/scripts/census.apex),
+    select all, copy, paste into the Execute Anonymous window and Execute. Leave `MODE` set to
+    `'BEFORE'`. It reads only and changes nothing.
+
+    In the log, find the line headed `COPY THIS LINE:` and copy the `String BEFORE = '...';`
+    it prints. That single line is your baseline. Keep it.
+
+    Note the `Campaign` figure it reports. If it is above zero, tell your facilitator: one of
+    the later exercises does not reproduce in an org that already has campaigns.
+
+    **10b. Seed.** In the same window, replace everything with this one line and Execute:
 
     ```apex
     CoastieEdTrainingDataLoader.run();
@@ -156,15 +188,23 @@ Complete these in order. Each step depends on the one before it.
     it here rather than seeding a half-configured org.
     Progress is tracked under **Setup > Apex Jobs** (the seed runs as a chain of four jobs).
 
+    > **You may also receive a summary email, and it is a bonus rather than a check.** The
+    > loader tries to email the running user a per-object summary — `Account: success=1200,
+    > errors=0`, one line each, plus error text where rows failed. **If it arrives and any line
+    > shows `errors=` above zero, report that line to your facilitator.** But whether it arrives
+    > depends on your org's email deliverability settings, and a failed send is silent. **No
+    > email means nothing at all — it does not mean success.** Step 10c is the verification.
+
+    **10c. After count.** Once all four jobs show Completed, paste the census script in again
+    and make two edits **in the Execute Anonymous window** before running it: replace the
+    `String BEFORE = '';` line with the one you copied at 10a, and change `MODE` to `'AFTER'`.
+    Execute. It prints before, after, delta and **PASS** or **FAIL** for each object.
+
     > **Four Completed jobs does NOT mean four successful jobs.** The loader inserts with partial
     > success enabled by design, so a job that discards rows still finishes and still reports
     > `Completed`. This has happened: an earlier build of the seed silently dropped 436 of 1,744
-    > gift transactions while all four jobs reported success. **The delta check below is the
-    > actual verification. Do not skip it.**
-
-    When all four jobs show Completed, paste your `BASELINE` block into `scripts/census.apex`,
-    set `MODE = 'AFTER'`, and run it. It prints your before and after counts, the difference, and
-    PASS or FAIL against each expected delta.
+    > gift transactions while all four jobs reported success. **Step 10c is the actual
+    > verification. Do not skip it.**
 
 ## Deploy
 
@@ -298,7 +338,8 @@ Every `SETUP INCOMPLETE` message below is also what `CoastieEdTrainingDataLoader
   shortfall to your instructor; it is a package problem, not something you can fix in the org.
 - **StandardValueSet warning on deploy**: deploying `OpportunityStage`/`LeadStatus` replaces the full org value sets. Intended for disposable training orgs only. See step 7.
 - **My org expired part-way through**: all trial and demo orgs expire in 30 days. Request a new one at step 1 and re-run this setup. Nothing carries over.
-- **The seed did not appear to finish**: check **Setup > Apex Jobs**. The seed runs as four chained jobs; all four should show Completed. If a job shows Failed, open it for the error.
+- **The seed did not appear to finish**: check **Setup > Apex Jobs**. The seed runs as four chained jobs; all four should show Completed. If a job shows Failed, open it for the error. **Four Completed jobs is not proof of success** — run step 10c.
+- **I did not get the summary email**: that is common and it is not a problem. Apex email delivery depends on your org's deliverability settings and the loader does not report a failed send. Use step 10c instead.
 
 ## Regenerating the dataset
 

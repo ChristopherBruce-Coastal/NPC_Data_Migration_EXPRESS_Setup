@@ -17,10 +17,15 @@
  *   Business Account record type must exist (learners create this during setup);
  *   Fundraising must be on AND GiftTransaction createable by the running user;
  *   State and Country/Territory Picklists must be enabled; "Allow users to relate
- *   a contact to multiple accounts" must be enabled; the "Wire" value must be present
- *   on GiftTransaction.PaymentMethod (manual, see wirePaymentMethodPresent); and the
- *   org must not already be seeded. run() throws with a clear message if any
- *   precheck fails.
+ *   a contact to multiple accounts" must be enabled; and the org must not already
+ *   be seeded. run() throws with a clear message if any precheck fails.
+ *
+ *   HISTORY, so nobody re-adds it: a seventh branch checked for a "Wire" value on
+ *   GiftTransaction.PaymentMethod, because CE_GiftTransaction.csv seeded Wire on 436
+ *   of 1,744 rows and a stock NPC org rejects it. That was a defect in the seed data,
+ *   not a setup step. The CSV now seeds ACH instead, so there is nothing to gate and
+ *   the branch and its helper were removed (2026-08-24). Do not reinstate either
+ *   without also reinstating Wire in the CSV.
  * - Every precheck message MUST contain the literal "SETUP INCOMPLETE" or
  *   "ALREADY SEEDED". CoastieEdTrainingDataLoaderTest asserts that, deliberately,
  *   so the test passes in any org state and a missing setup step can never turn
@@ -166,12 +171,6 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
                 + 'a contact to multiple accounts" > Save, then re-run the loader. Without it the 400 '
                 + 'secondary Account-Contact relationships cannot load.';
         }
-        if (!wirePaymentMethodPresent()) {
-            return 'SETUP INCOMPLETE: The "Wire" value is missing from Gift Transaction > Payment '
-                + 'Method. Setup > Object Manager > Gift Transaction > Fields & Relationships > '
-                + 'Payment Method > Payment Method Picklist Values > New > enter Wire > Save, then '
-                + 're-run the loader. Part of the seed dataset cannot load without it.';
-        }
         Integer seeded = [SELECT COUNT() FROM Account WHERE Website LIKE '%.example.org'];
         if (seeded > 0) {
             return 'ALREADY SEEDED: This org already contains Coastie-Ed training accounts (' + seeded
@@ -247,33 +246,6 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
     private static Boolean contactsToMultipleAccountsEnabled() {
         Schema.SObjectType acr = Schema.getGlobalDescribe().get('AccountContactRelation');
         return acr != null && acr.getDescribe().isCreateable();
-    }
-
-    /**
-     * True when the "Wire" value is present on GiftTransaction.PaymentMethod. Resolved
-     * dynamically for the same reason the other setting checks are: GiftTransaction does not
-     * exist until Fundraising is enabled, and a compile-time reference would stop this class
-     * compiling in exactly the orgs the prechecks are meant to diagnose.
-     *
-     * Wire CANNOT be shipped as metadata, which is why README step 7 is a manual step.
-     * A field-level valueSet deploy is ACCEPTED by the Metadata API, reported as
-     * "Changed CustomField", and silently does nothing (verified 2026-08-21 against the
-     * correct org id, in both Apex describe and Object Manager). PaymentMethod is also not
-     * exposed as a StandardValueSet, so the OpportunityStage/LeadStatus route is unavailable.
-     *
-     * Uses .equals() deliberately, NOT ==. Apex String == is case-insensitive, so == would
-     * pass on a hand-typed "wire" that the restricted picklist then rejects at load time.
-     */
-    @TestVisible
-    private static Boolean wirePaymentMethodPresent() {
-        Schema.SObjectType gt = Schema.getGlobalDescribe().get('GiftTransaction');
-        if (gt == null) { return false; }
-        Schema.SObjectField f = gt.getDescribe().fields.getMap().get('paymentmethod');
-        if (f == null) { return false; }
-        for (Schema.PicklistEntry pe : f.getDescribe().getPicklistValues()) {
-            if (pe.getValue().equals('Wire')) { return true; }
-        }
-        return false;
     }
 
     public void execute(QueueableContext ctx) {

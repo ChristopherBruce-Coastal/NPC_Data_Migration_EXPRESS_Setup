@@ -124,7 +124,13 @@ if (MODE == 'BEFORE') {
     String blk = 'Map<String, Integer> baseline = new Map<String, Integer>{\n';
     for (Integer i = 0; i < order.size(); i++) {
         String k = order[i];
-        blk += '    \'' + k + '\'' + ' => ' + now.get(k) + (i < order.size() - 1 ? ',' : '') + '\n';
+        Integer v = now.get(k);
+        // An object that does not exist yet has zero records, so it baselines at 0 rather
+        // than -1. Without this, running BEFORE prior to the deploy (when Deliverable__c
+        // and GiftTransaction may not exist) produces a delta one too high and a false FAIL.
+        String note = '';
+        if (v == null || v < 0) { note = '   // object not present at baseline'; v = 0; }
+        blk += '    \'' + k + '\'' + ' => ' + v + (i < order.size() - 1 ? ',' : '') + note + '\n';
     }
     blk += '};';
     System.debug('\n' + blk);
@@ -143,6 +149,7 @@ if (MODE == 'BEFORE') {
     System.debug('OBJECT                    BEFORE      AFTER      DELTA   EXPECTED  RESULT');
     for (String k : order) {
         Integer b = baseline.containsKey(k) ? baseline.get(k) : 0;
+        if (b == null || b < 0) { b = 0; }   // absent at baseline == zero records
         Integer a = now.get(k);
         if (a == null) { a = -1; }
         String res;

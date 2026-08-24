@@ -38,7 +38,7 @@ Complete these in order. Each step depends on the one before it.
 
 1. **Get your training org.** Request a Nonprofit Cloud demo org from
    [Partner Learning Camp > Demo Org *(Ctrl+Click or Cmd+Click(Mac) to open in a new tab)*](https://partnerlearningcamp.salesforce.com/s/demo-org),
-   choosing the **NPC** demo type. EXPRESS learners are Coastal consultants with PLC access,
+   choosing the **IDO-NPC** demo type. EXPRESS learners are Coastal consultants with PLC access,
    so you are eligible.
 
    > **Your org expires in 30 days.** So does every Salesforce trial org. Plan the exercise

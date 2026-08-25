@@ -111,16 +111,38 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
         this.keyMaps = keyMaps;
     }
 
-    /** Entry point. Validates prerequisites, then enqueues the first load phase. */
+    /**
+     * Entry point. Validates prerequisites, THEN sets the bypass, then enqueues the first
+     * load phase.
+     *
+     * ORDER MATTERS AND IT IS A FIX, NOT A STYLE CHOICE (finding #62, 2026-08-24).
+     * This method used to upsert Bypass_Automation__c = true as its first statement,
+     * before precheck() ran. finish() is the only place the flag is cleared, and finish()
+     * only runs at the end of a successful chain, so ANY throw from run() left the org with
+     * automation bypassed permanently - including the ALREADY SEEDED guard that a second
+     * run() is guaranteed to hit. HarborAccountEnrichment is the only mechanism that reads
+     * the flag, so a stuck bypass silently removes the governor-limit lesson: the learner's
+     * bulk Account load simply succeeds and nothing anywhere reports why.
+     *
+     * precheck() performs no DML, so running it first fires no automation and needs no
+     * bypass. Do not reorder these two blocks back.
+     *
+     * KNOWN RESIDUAL, deliberately not fixed here: if a Queueable phase dies outright
+     * (uncaught governor limit rather than a per-step exception, which execute() already
+     * catches), finish() never runs and the flag stays set. That needs a monitoring or
+     * finally-style mechanism and is a larger change than this defect warrants. A
+     * facilitator seeing a clean large Account load should check Migration_Settings__c.
+     */
     public static Id run() {
-        Migration_Settings__c bypassMs = Migration_Settings__c.getOrgDefaults();
-            bypassMs.Bypass_Automation__c = true;
-        upsert bypassMs;
-
         String problem = precheck();
         if (problem != null) {
             throw new LoaderException(problem);
         }
+
+        Migration_Settings__c bypassMs = Migration_Settings__c.getOrgDefaults();
+            bypassMs.Bypass_Automation__c = true;
+        upsert bypassMs;
+
         return System.enqueueJob(new CoastieEdTrainingDataLoader(0, '', new Map<String, Map<String, Id>>()));
     }
 

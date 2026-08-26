@@ -344,8 +344,10 @@ Every `SETUP INCOMPLETE` message below is also what `CoastieEdTrainingDataLoader
 ## Regenerating the dataset
 
 The TARGET dataset and metadata are reproducible from the builder scripts in the EXPRESS
-curriculum workspace (seed `20260706`). The SOURCE (defective) dataset is intentionally
-NOT in this repo; it is distributed to learners as a workbook, not loaded to the org.
+curriculum workspace (seed `20260706`). The SOURCE dataset is intentionally
+NOT in this repo and is not distributed to learners as a file. Learners read it from the
+`Source_NPC` database with the read-only login their facilitator provides; the setup in
+this repo does not load it.
 
 > **Facilitators: do not run a regenerate-and-diff before a cohort until the builders have been
 > reconciled with this repo.** They are currently out of sync, and regenerating overwrites fixes

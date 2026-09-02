@@ -163,7 +163,10 @@ public with sharing class CoastieEdTrainingDataLoader implements Queueable {
             throw new LoaderException(problem);
         }
         System.debug(LoggingLevel.ERROR,
-            'SETUP OK: every setup step verified. Run CoastieEdTrainingDataLoader.run(); to seed.');
+            'SETUP OK: every setup step verified. NEXT, in this order: take your BEFORE census '
+            + '(README step 10a, scripts/census.apex with MODE set to BEFORE) and keep the '
+            + 'String BEFORE line it prints. Only then run CoastieEdTrainingDataLoader.run(); '
+            + 'The seed runs ONCE per org and the BEFORE reading cannot be recovered afterwards.');
     }
 
     /** Returns null when the org is ready to seed, otherwise a learner-facing message. */

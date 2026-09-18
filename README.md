@@ -46,7 +46,9 @@ into a window and execute it. You do not "call" a script file.
 4. Paste the code in. For a one-line command, just type it. For the census script, open it in
    your browser at the raw link below, select all, copy, paste:
    [scripts/census.apex (raw)](https://raw.githubusercontent.com/ChristopherBruce-Coastal/NPC_Data_Migration_EXPRESS_Setup/main/scripts/census.apex)
-5. Click **Execute**, then read the log that opens.
+5. Click **Execute**. In the log window that opens, check the **Debug Only**
+   checkbox (top of the log) instead of scrolling through the raw log to find your
+   output.
 
 > **Output appears tagged `|ERROR|`, and that is not an error.** Apex `System.debug()`
 > defaults to a level that a standard trace flag filters out, so both the loader and the

@@ -175,7 +175,7 @@ Complete these in order. Each step depends on the one before it.
     `'BEFORE'`. It reads only and changes nothing.
 
     In the log, find the line headed `COPY THIS LINE:` and copy the `String BEFORE = '...';`
-    it prints. That single line is your baseline. Keep it.
+    it prints. That single line is your baseline. Keep it, you will use this string in step 10c.
 
     Note the `Campaign` figure it reports. If it is above zero, tell your facilitator: one of
     the later exercises does not reproduce in an org that already has campaigns.
@@ -200,7 +200,7 @@ Complete these in order. Each step depends on the one before it.
 
     **10c. After count.** Once all six jobs show Completed, paste the census script in again
     and make two edits **in the Execute Anonymous window** before running it: replace the
-    `String BEFORE = '';` line with the one you copied at 10a, then change `Srting MODE = 'BEFORE` to `'AFTER'`.
+    `String BEFORE = '';` line with the line you copied at step 10a verbatim, then change `Srting MODE = 'BEFORE` to `'AFTER'`.
     Execute. It prints before, after, delta and **PASS** or **FAIL** for each object.
 
     > **Six Completed jobs does NOT mean six successful jobs.** The loader inserts with partial

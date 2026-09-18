@@ -200,7 +200,7 @@ Complete these in order. Each step depends on the one before it.
 
     **10c. After count.** Once all six jobs show Completed, paste the census script in again
     and make two edits **in the Execute Anonymous window** before running it: replace the
-    `String BEFORE = '';` line with the one you copied at 10a, and change `MODE` to `'AFTER'`.
+    `String BEFORE = '';` line with the one you copied at 10a, then change `Srting MODE = 'BEFORE` to `'AFTER'`.
     Execute. It prints before, after, delta and **PASS** or **FAIL** for each object.
 
     > **Six Completed jobs does NOT mean six successful jobs.** The loader inserts with partial
